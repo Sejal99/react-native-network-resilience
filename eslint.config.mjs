@@ -24,6 +24,21 @@ export default defineConfig([
     },
   },
   {
+    // Plain JS/JSX files (config scripts, entry points, etc.) are parsed
+    // directly. Loading the project's Babel config (react-native-builder-bob)
+    // pulls in a native-ESM plugin that only works when Babel runs
+    // asynchronously or under Node >=22, so we skip it here.
+    files: ['**/*.js', '**/*.jsx'],
+    languageOptions: {
+      parserOptions: {
+        sourceType: 'module',
+        ecmaFeatures: { jsx: true },
+        requireConfigFile: false,
+        babelOptions: { configFile: false, babelrc: false },
+      },
+    },
+  },
+  {
     ignores: ['node_modules/', 'lib/'],
   },
 ]);
