@@ -6,7 +6,7 @@
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
     ".": {
-      "react-native-network-resilience-source": "./src/index.tsx",
+      "react-native-network-resilience-source": "./src/index.ts",
       "types": "./lib/typescript/src/index.d.ts",
       "default": "./lib/module/index.js"
     },
@@ -178,5 +178,8 @@
       "vite"
     ],
     "version": "0.63.0"
+  },
+  "dependencies": {
+    "@react-native-community/netinfo": "^12.0.1"
   }
 }

@@ -14,11 +14,7 @@ npm install react-native-network-resilience
 
 
 ```js
-import { multiply } from 'react-native-network-resilience';
-
-// ...
-
-const result = multiply(3, 7);
+import { /* API to be added */ } from 'react-native-network-resilience';
 ```
 
 

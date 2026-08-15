@@ -1,0 +1,27 @@
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export type BackoffStrategy = 'fixed' | 'exponential';
+
+export interface RetryConfig {
+  maxAttempts: number;
+  backoff: BackoffStrategy;
+  initialDelay: number;
+  maxDelay: number;
+  jitter: boolean;
+}
+
+export interface RequestConfig {
+  url: string;
+  method: HttpMethod;
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeout?: number;
+  signal?: AbortSignal;
+}
+
+export interface NetworkClientConfig {
+  baseURL?: string;
+  timeout?: number;
+  retry?: Partial<RetryConfig>;
+  deduplication?: boolean;
+}
