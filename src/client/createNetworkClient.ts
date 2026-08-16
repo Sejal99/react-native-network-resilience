@@ -4,6 +4,7 @@ import { FetchTransport } from '../transport/FetchTransport';
 import { RetryPolicy } from '../retry/RetryPolicy';
 import type { NetworkClientConfig } from '../types';
 import { RequestRegistry } from '../request/RequestRegistry';
+import { NetInfoConnectivityProvider } from '../connectivity/NetInfoConnectivityProvider';
 
 const DEFAULT_RETRY_CONFIG = {
   maxAttempts: 3,
@@ -22,10 +23,17 @@ export function createNetworkClient(
   };
 
   const transport = new FetchTransport();
+  const connectivityProvider =
+    config.connectivityProvider ?? new NetInfoConnectivityProvider();
 
   const retryPolicy = new RetryPolicy(retryConfig);
 
-  const requestManager = new RequestManager(transport, retryPolicy);
+  const requestManager = new RequestManager(
+    transport,
+    retryPolicy,
+    connectivityProvider,
+    config.waitForConnectivity ?? false
+  );
 
   const requestRegistry = new RequestRegistry();
 

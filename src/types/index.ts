@@ -1,3 +1,5 @@
+import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
+
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export type BackoffStrategy = 'fixed' | 'exponential';
@@ -24,4 +26,6 @@ export interface NetworkClientConfig {
   timeout?: number;
   retry?: Partial<RetryConfig>;
   deduplication?: boolean;
+  connectivityProvider?: ConnectivityProvider;
+  waitForConnectivity?: boolean;
 }

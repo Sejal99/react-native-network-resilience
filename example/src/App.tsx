@@ -22,7 +22,7 @@ const client = createNetworkClient({
   },
 
   timeout: 5000,
-
+  waitForConnectivity: true,
   deduplication: true,
 });
 
