@@ -7,9 +7,6 @@ import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
 import { createRequestId } from './createRequestId';
 
 export class RequestManager {
-  getMetrics() {
-    return this.eventEmitter?.getMetrics() ?? [];
-  }
   constructor(
     private readonly transport: HttpTransport,
     private readonly retryPolicy: RetryPolicy,
@@ -18,6 +15,10 @@ export class RequestManager {
     private readonly connectivityTimeout = 30000,
     private readonly eventEmitter?: NetworkEventEmitter
   ) {}
+
+  getMetrics() {
+    return this.eventEmitter?.getMetrics() ?? [];
+  }
 
   async execute<T>(config: RequestConfig): Promise<T> {
     const requestId = createRequestId();
@@ -58,6 +59,17 @@ export class RequestManager {
 
           return result;
         } catch (error) {
+          // User cancelled the request.
+          // Cancellation must NEVER be retried.
+          if (
+            error instanceof Error &&
+            'code' in error &&
+            error.code === 'CANCELLED'
+          ) {
+            throw error;
+          }
+
+          // Check whether this error should be retried.
           if (!this.retryPolicy.shouldRetry(error, attempt)) {
             throw error;
           }
@@ -109,6 +121,8 @@ export class RequestManager {
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
   }
 }

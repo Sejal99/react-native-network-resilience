@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -27,20 +27,17 @@ const client = createNetworkClient({
 });
 
 const App = () => {
+  const controllerRef = useRef<AbortController | null>(null);
+
   const [networkType, setNetworkType] = useState('Checking...');
-
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
-
   const [isReachable, setIsReachable] = useState<boolean | null>(null);
 
   const [requestStatus, setRequestStatus] = useState('Idle');
-
   const [response, setResponse] = useState<unknown>(null);
-
   const [error, setError] = useState<string | null>(null);
 
-  const [events, setEvents] = useState<string[]>([]);
-
+  const [events, _] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
 
   useEffect(() => {
@@ -53,43 +50,11 @@ const App = () => {
     return unsubscribe;
   }, []);
 
-  const updateEvents = () => {
-    const currentMetrics = client.getMetrics();
-
-    setMetrics(currentMetrics);
+  const updateMetrics = () => {
+    setMetrics(client.getMetrics());
   };
 
-  const makeRequest = async () => {
-    setRequestStatus('Starting request...');
-    setResponse(null);
-    setError(null);
-
-    setEvents((prev) => [...prev, 'REQUEST BUTTON PRESSED']);
-
-    try {
-      if (!isConnected) {
-        setRequestStatus('⏳ Offline — waiting for internet...');
-      } else {
-        setRequestStatus('🌐 Sending request...');
-      }
-
-      const result = await client.get('/500');
-
-      setResponse(result);
-      setRequestStatus('✅ Request successful');
-
-      updateEvents();
-    } catch (err: any) {
-      console.log('REQUEST ERROR:', err);
-
-      setError(err?.message ?? 'Something went wrong');
-
-      setRequestStatus('❌ Request failed');
-
-      updateEvents();
-    }
-  };
-
+  // Normal successful request
   const makeSuccessRequest = async () => {
     setRequestStatus('🌐 Sending request...');
     setResponse(null);
@@ -101,14 +66,78 @@ const App = () => {
       setResponse(result);
       setRequestStatus('✅ Request successful');
 
-      updateEvents();
+      updateMetrics();
     } catch (err: any) {
       setError(err?.message ?? 'Something went wrong');
-
       setRequestStatus('❌ Request failed');
 
-      updateEvents();
+      updateMetrics();
     }
+  };
+
+  // Retry test
+  const makeRetryRequest = async () => {
+    setRequestStatus('🌐 Starting retry test...');
+    setResponse(null);
+    setError(null);
+
+    try {
+      const result = await client.get('https://httpstat.us/500');
+
+      setResponse(result);
+      setRequestStatus('✅ Request successful');
+
+      updateMetrics();
+    } catch (err: any) {
+      setError(err?.message ?? 'Request failed');
+      setRequestStatus('❌ Request failed after retries');
+
+      updateMetrics();
+    }
+  };
+
+  // Start cancellable request
+  const startRequest = async () => {
+    const controller = new AbortController();
+
+    controllerRef.current = controller;
+
+    setRequestStatus('⏳ Request running...');
+    setResponse(null);
+    setError(null);
+
+    try {
+      const result = await client.get('https://httpstat.us/200?sleep=15000', {
+        signal: controller.signal,
+      });
+
+      setResponse(result);
+      setRequestStatus('✅ Request completed');
+
+      updateMetrics();
+    } catch (err: any) {
+      setError(err?.message ?? 'Request failed');
+
+      if (controller.signal.aborted) {
+        setRequestStatus('🚫 Request cancelled');
+      } else {
+        setRequestStatus('❌ Request failed');
+      }
+
+      updateMetrics();
+    } finally {
+      controllerRef.current = null;
+    }
+  };
+
+  // Cancel current request
+  const cancelRequest = () => {
+    if (!controllerRef.current) {
+      setRequestStatus('⚠️ No active request');
+      return;
+    }
+
+    controllerRef.current.abort();
   };
 
   return (
@@ -150,14 +179,30 @@ const App = () => {
           <Text style={styles.status}>{requestStatus}</Text>
         </View>
 
-        {/* BUTTONS */}
+        {/* NORMAL SUCCESS */}
 
         <View style={styles.buttonContainer}>
-          <Button title="Test Retry (500)" onPress={makeRequest} />
+          <Button title="Test Success" onPress={makeSuccessRequest} />
         </View>
 
+        {/* RETRY */}
+
         <View style={styles.buttonContainer}>
-          <Button title="Test Success (200)" onPress={makeSuccessRequest} />
+          <Button title="Test Retry (500)" onPress={makeRetryRequest} />
+        </View>
+
+        {/* CANCELLATION */}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Request Cancellation</Text>
+
+          <View style={styles.buttonContainer}>
+            <Button title="Start Request" onPress={startRequest} />
+          </View>
+
+          <View style={styles.buttonContainer}>
+            <Button title="Cancel Request" onPress={cancelRequest} />
+          </View>
         </View>
 
         {/* EVENTS */}
