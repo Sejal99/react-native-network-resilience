@@ -1,4 +1,5 @@
 import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
+import type { NetworkEventListener } from '../events/NetworkEventListener';
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
@@ -29,4 +30,5 @@ export interface NetworkClientConfig {
   connectivityProvider?: ConnectivityProvider;
   waitForConnectivity?: boolean;
   connectivityTimeout?: number;
+  onEvent?: NetworkEventListener;
 }

@@ -5,6 +5,7 @@ import { RetryPolicy } from '../retry/RetryPolicy';
 import type { NetworkClientConfig } from '../types';
 import { RequestRegistry } from '../request/RequestRegistry';
 import { NetInfoConnectivityProvider } from '../connectivity/NetInfoConnectivityProvider';
+import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
 
 const DEFAULT_RETRY_CONFIG = {
   maxAttempts: 3,
@@ -25,6 +26,7 @@ export function createNetworkClient(
   const transport = new FetchTransport();
   const connectivityProvider =
     config.connectivityProvider ?? new NetInfoConnectivityProvider();
+  const eventEmitter = new NetworkEventEmitter(config.onEvent);
 
   const retryPolicy = new RetryPolicy(retryConfig);
 
@@ -33,7 +35,8 @@ export function createNetworkClient(
     retryPolicy,
     connectivityProvider,
     config.waitForConnectivity ?? false,
-    config.connectivityTimeout ?? 30000
+    config.connectivityTimeout ?? 30000,
+    eventEmitter
   );
 
   const requestRegistry = new RequestRegistry();

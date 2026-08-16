@@ -3,6 +3,8 @@ import { RetryPolicy } from '../retry/RetryPolicy';
 import type { RequestConfig } from '../types';
 import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
 import { waitForConnectivity } from '../connectivity/waitForConnectivity';
+import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
+import { createRequestId } from './createRequestId';
 
 export class RequestManager {
   constructor(
@@ -10,37 +12,96 @@ export class RequestManager {
     private readonly retryPolicy: RetryPolicy,
     private readonly connectivityProvider?: ConnectivityProvider,
     private readonly waitForNetwork = false,
-    private readonly connectivityTimeout = 30000
+    private readonly connectivityTimeout = 30000,
+    private readonly eventEmitter?: NetworkEventEmitter
   ) {}
 
   async execute<T>(config: RequestConfig): Promise<T> {
-    if (
-      this.waitForNetwork &&
-      this.connectivityProvider &&
-      !this.connectivityProvider.isOnline()
-    ) {
-      await waitForConnectivity(
-        this.connectivityProvider,
-        this.connectivityTimeout
-      );
-    }
+    const requestId = createRequestId();
+    const startTime = Date.now();
 
-    let attempt = 1;
+    this.eventEmitter?.emit({
+      type: 'REQUEST_START',
+      requestId,
+      url: config.url,
+      method: config.method,
+    });
 
-    while (true) {
-      try {
-        return await this.transport.request<T>(config);
-      } catch (error) {
-        if (!this.retryPolicy.shouldRetry(error, attempt)) {
-          throw error;
-        }
-
-        const delay = this.retryPolicy.getDelay(attempt);
-
-        await this.sleep(delay);
-
-        attempt++;
+    try {
+      if (
+        this.waitForNetwork &&
+        this.connectivityProvider &&
+        !this.connectivityProvider.isOnline()
+      ) {
+        await waitForConnectivity(
+          this.connectivityProvider,
+          this.connectivityTimeout
+        );
       }
+
+      let attempt = 1;
+
+      while (true) {
+        try {
+          const result = await this.transport.request<T>(config);
+
+          this.eventEmitter?.emit({
+            type: 'REQUEST_SUCCESS',
+            requestId,
+            url: config.url,
+            method: config.method,
+            duration: Date.now() - startTime,
+          });
+
+          return result;
+        } catch (error) {
+          if (!this.retryPolicy.shouldRetry(error, attempt)) {
+            throw error;
+          }
+
+          const delay = this.retryPolicy.getDelay(attempt);
+
+          this.eventEmitter?.emit({
+            type: 'REQUEST_RETRY',
+            requestId,
+            url: config.url,
+            method: config.method,
+            attempt,
+            delay,
+          });
+
+          await this.sleep(delay);
+
+          attempt++;
+        }
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'CANCELLED'
+      ) {
+        this.eventEmitter?.emit({
+          type: 'REQUEST_CANCELLED',
+          requestId,
+          url: config.url,
+          method: config.method,
+          duration,
+        });
+      } else {
+        this.eventEmitter?.emit({
+          type: 'REQUEST_ERROR',
+          requestId,
+          url: config.url,
+          method: config.method,
+          duration,
+          error,
+        });
+      }
+
+      throw error;
     }
   }
 

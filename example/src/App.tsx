@@ -11,7 +11,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { createNetworkClient } from 'react-native-network-resilience';
 
 const client = createNetworkClient({
-  baseURL: 'https://jsonplaceholder.typicode.com',
+  baseURL: 'https://httpstat.us',
 
   timeout: 5000,
 
@@ -20,6 +20,9 @@ const client = createNetworkClient({
   waitForConnectivity: true,
 
   connectivityTimeout: 30000,
+  onEvent: (event) => {
+    console.log('📡 NETWORK EVENT:', event);
+  },
 });
 
 const App = () => {
@@ -57,7 +60,7 @@ const App = () => {
         setRequestStatus('🌐 Sending request...');
       }
 
-      const result = await client.get('/todos/1');
+      const result = await client.get('/500');
 
       setResponse(result);
       setRequestStatus('✅ Request successful');
