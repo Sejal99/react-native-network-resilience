@@ -105,10 +105,18 @@ export class NetworkClient {
   }
 
   private buildUrl(url: string): string {
+    // If an absolute URL is provided, use it directly
+    if (/^https?:\/\//i.test(url)) {
+      return url;
+    }
+
     if (!this.config.baseURL) {
       return url;
     }
 
-    return `${this.config.baseURL.replace(/\/$/, '')}/${url.replace(/^\//, '')}`;
+    return `${this.config.baseURL.replace(/\/$/, '')}/${url.replace(
+      /^\//,
+      ''
+    )}`;
   }
 }

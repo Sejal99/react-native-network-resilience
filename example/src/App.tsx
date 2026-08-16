@@ -50,6 +50,32 @@ const App = () => {
     return unsubscribe;
   }, []);
 
+  const makeDeduplicationTest = async () => {
+    setRequestStatus('🔄 Testing deduplication...');
+    setResponse(null);
+    setError(null);
+
+    try {
+      const [result1, result2] = await Promise.all([
+        client.get('/todos/1'),
+        client.get('/todos/1'),
+      ]);
+
+      setResponse({
+        result1,
+        result2,
+        message: '✅ Deduplication test passed',
+      });
+
+      setRequestStatus('✅ Deduplication working');
+      updateMetrics();
+    } catch (err: any) {
+      setError(err?.message ?? 'Deduplication test failed');
+      setRequestStatus('❌ Deduplication test failed');
+      updateMetrics();
+    }
+  };
+
   const updateMetrics = () => {
     setMetrics(client.getMetrics());
   };
@@ -203,6 +229,9 @@ const App = () => {
           <View style={styles.buttonContainer}>
             <Button title="Cancel Request" onPress={cancelRequest} />
           </View>
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button title="Test Deduplication" onPress={makeDeduplicationTest} />
         </View>
 
         {/* EVENTS */}
