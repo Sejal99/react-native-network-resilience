@@ -9,7 +9,8 @@ export class RequestManager {
     private readonly transport: HttpTransport,
     private readonly retryPolicy: RetryPolicy,
     private readonly connectivityProvider?: ConnectivityProvider,
-    private readonly waitForNetwork = false
+    private readonly waitForNetwork = false,
+    private readonly connectivityTimeout = 30000
   ) {}
 
   async execute<T>(config: RequestConfig): Promise<T> {
@@ -18,7 +19,10 @@ export class RequestManager {
       this.connectivityProvider &&
       !this.connectivityProvider.isOnline()
     ) {
-      await waitForConnectivity(this.connectivityProvider);
+      await waitForConnectivity(
+        this.connectivityProvider,
+        this.connectivityTimeout
+      );
     }
 
     let attempt = 1;

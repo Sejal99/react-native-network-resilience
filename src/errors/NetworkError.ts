@@ -3,7 +3,8 @@ export type NetworkErrorCode =
   | 'NETWORK_ERROR'
   | 'HTTP_ERROR'
   | 'CANCELLED'
-  | 'MAX_RETRIES_EXCEEDED';
+  | 'MAX_RETRIES_EXCEEDED'
+  | 'NETWORK_UNAVAILABLE';
 
 export class NetworkError extends Error {
   readonly code: NetworkErrorCode;

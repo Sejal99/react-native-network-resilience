@@ -28,4 +28,5 @@ export interface NetworkClientConfig {
   deduplication?: boolean;
   connectivityProvider?: ConnectivityProvider;
   waitForConnectivity?: boolean;
+  connectivityTimeout?: number;
 }

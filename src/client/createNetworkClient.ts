@@ -32,7 +32,8 @@ export function createNetworkClient(
     transport,
     retryPolicy,
     connectivityProvider,
-    config.waitForConnectivity ?? false
+    config.waitForConnectivity ?? false,
+    config.connectivityTimeout ?? 30000
   );
 
   const requestRegistry = new RequestRegistry();
