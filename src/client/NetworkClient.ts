@@ -10,6 +10,10 @@ export class NetworkClient {
     private readonly requestRegistry: RequestRegistry
   ) {}
 
+  getMetrics() {
+    return this.requestManager.getMetrics();
+  }
+
   async get<T>(
     url: string,
     options: Omit<RequestConfig, 'url' | 'method'> = {}

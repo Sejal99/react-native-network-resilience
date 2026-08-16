@@ -7,6 +7,9 @@ import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
 import { createRequestId } from './createRequestId';
 
 export class RequestManager {
+  getMetrics() {
+    return this.eventEmitter?.getMetrics() ?? [];
+  }
   constructor(
     private readonly transport: HttpTransport,
     private readonly retryPolicy: RetryPolicy,

@@ -11,7 +11,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { createNetworkClient } from 'react-native-network-resilience';
 
 const client = createNetworkClient({
-  baseURL: 'https://httpstat.us',
+  baseURL: 'https://jsonplaceholder.typicode.com',
 
   timeout: 5000,
 
@@ -20,6 +20,7 @@ const client = createNetworkClient({
   waitForConnectivity: true,
 
   connectivityTimeout: 30000,
+
   onEvent: (event) => {
     console.log('📡 NETWORK EVENT:', event);
   },
@@ -38,6 +39,10 @@ const App = () => {
 
   const [error, setError] = useState<string | null>(null);
 
+  const [events, setEvents] = useState<string[]>([]);
+
+  const [metrics, setMetrics] = useState<any[]>([]);
+
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
       setNetworkType(state.type);
@@ -48,10 +53,18 @@ const App = () => {
     return unsubscribe;
   }, []);
 
+  const updateEvents = () => {
+    const currentMetrics = client.getMetrics();
+
+    setMetrics(currentMetrics);
+  };
+
   const makeRequest = async () => {
     setRequestStatus('Starting request...');
     setResponse(null);
     setError(null);
+
+    setEvents((prev) => [...prev, 'REQUEST BUTTON PRESSED']);
 
     try {
       if (!isConnected) {
@@ -64,12 +77,37 @@ const App = () => {
 
       setResponse(result);
       setRequestStatus('✅ Request successful');
+
+      updateEvents();
     } catch (err: any) {
       console.log('REQUEST ERROR:', err);
 
       setError(err?.message ?? 'Something went wrong');
 
       setRequestStatus('❌ Request failed');
+
+      updateEvents();
+    }
+  };
+
+  const makeSuccessRequest = async () => {
+    setRequestStatus('🌐 Sending request...');
+    setResponse(null);
+    setError(null);
+
+    try {
+      const result = await client.get('/todos/1');
+
+      setResponse(result);
+      setRequestStatus('✅ Request successful');
+
+      updateEvents();
+    } catch (err: any) {
+      setError(err?.message ?? 'Something went wrong');
+
+      setRequestStatus('❌ Request failed');
+
+      updateEvents();
     }
   };
 
@@ -79,6 +117,7 @@ const App = () => {
         <Text style={styles.title}>Network Resilience</Text>
 
         {/* NETWORK STATUS */}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Network Status</Text>
 
@@ -104,18 +143,65 @@ const App = () => {
         </View>
 
         {/* REQUEST STATUS */}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Request Status</Text>
 
           <Text style={styles.status}>{requestStatus}</Text>
         </View>
 
-        {/* REQUEST BUTTON */}
+        {/* BUTTONS */}
+
         <View style={styles.buttonContainer}>
-          <Button title="Make Request" onPress={makeRequest} />
+          <Button title="Test Retry (500)" onPress={makeRequest} />
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <Button title="Test Success (200)" onPress={makeSuccessRequest} />
+        </View>
+
+        {/* EVENTS */}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Network Events</Text>
+
+          {events.length === 0 ? (
+            <Text>No manual events yet</Text>
+          ) : (
+            events.map((event, index) => (
+              <Text key={`${event}-${index}`} style={styles.event}>
+                {event}
+              </Text>
+            ))
+          )}
+        </View>
+
+        {/* METRICS */}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Request Metrics</Text>
+
+          {metrics.length === 0 ? (
+            <Text>No metrics yet</Text>
+          ) : (
+            metrics.map((metric) => (
+              <View key={metric.requestId} style={styles.metric}>
+                <Text>Request ID: {metric.requestId}</Text>
+
+                <Text>Duration: {metric.duration} ms</Text>
+
+                <Text>Attempts: {metric.attempts}</Text>
+
+                <Text>Retries: {metric.retries}</Text>
+
+                <Text>Success: {metric.success ? 'YES ✅' : 'NO ❌'}</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* RESPONSE */}
+
         {response !== null && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Response</Text>
@@ -127,6 +213,7 @@ const App = () => {
         )}
 
         {/* ERROR */}
+
         {error !== null && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Error</Text>
@@ -146,6 +233,7 @@ const styles = StyleSheet.create({
 
   content: {
     padding: 20,
+    paddingBottom: 40,
   },
 
   title: {
@@ -175,10 +263,24 @@ const styles = StyleSheet.create({
 
   status: {
     fontSize: 16,
+    fontWeight: '600',
   },
 
   buttonContainer: {
-    marginBottom: 20,
+    marginBottom: 12,
+  },
+
+  event: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+
+  metric: {
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
   },
 
   response: {
