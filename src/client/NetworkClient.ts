@@ -2,12 +2,16 @@ import { RequestManager } from '../request/RequestManager';
 import type { NetworkClientConfig, RequestConfig } from '../types';
 import { RequestRegistry } from '../request/RequestRegistry';
 import { createRequestKey } from '../request/createRequestKey';
+import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
+import { OfflineQueue } from '../queue/OfflineQueue';
 
 export class NetworkClient {
   constructor(
     private readonly config: NetworkClientConfig,
     private readonly requestManager: RequestManager,
-    private readonly requestRegistry: RequestRegistry
+    private readonly requestRegistry: RequestRegistry,
+    private readonly connectivityProvider?: ConnectivityProvider,
+    private readonly offlineQueue?: OfflineQueue
   ) {}
 
   getMetrics() {
@@ -82,6 +86,28 @@ export class NetworkClient {
       timeout: config.timeout ?? this.config.timeout,
     };
 
+    /*
+     * V2 OFFLINE QUEUE
+     *
+     * Only queue when:
+     * 1. Queue is configured
+     * 2. Connectivity provider exists
+     * 3. Device is offline
+     *
+     * GET requests are intentionally not queued yet.
+     * We will define the queue policy separately.
+     */
+    if (
+      this.offlineQueue &&
+      this.connectivityProvider &&
+      !this.connectivityProvider.isOnline() &&
+      requestConfig.method !== 'GET'
+    ) {
+      this.offlineQueue.add(requestConfig);
+
+      throw new Error('Request queued because device is offline');
+    }
+
     const shouldDeduplicate =
       this.config.deduplication === true && requestConfig.method === 'GET';
 
@@ -105,7 +131,6 @@ export class NetworkClient {
   }
 
   private buildUrl(url: string): string {
-    // If an absolute URL is provided, use it directly
     if (/^https?:\/\//i.test(url)) {
       return url;
     }

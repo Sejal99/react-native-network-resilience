@@ -6,6 +6,8 @@ import type { NetworkClientConfig } from '../types';
 import { RequestRegistry } from '../request/RequestRegistry';
 import { NetInfoConnectivityProvider } from '../connectivity/NetInfoConnectivityProvider';
 import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
+import { OfflineQueue } from '../queue/OfflineQueue';
+import { QueueProcessor } from '../queue/QueueProcessor';
 
 const DEFAULT_RETRY_CONFIG = {
   maxAttempts: 3,
@@ -24,8 +26,10 @@ export function createNetworkClient(
   };
 
   const transport = new FetchTransport();
+
   const connectivityProvider =
     config.connectivityProvider ?? new NetInfoConnectivityProvider();
+
   const eventEmitter = new NetworkEventEmitter(config.onEvent);
 
   const retryPolicy = new RetryPolicy(retryConfig);
@@ -41,5 +45,23 @@ export function createNetworkClient(
 
   const requestRegistry = new RequestRegistry();
 
-  return new NetworkClient(config, requestManager, requestRegistry);
+  // V2 Offline Queue
+  const offlineQueue = new OfflineQueue();
+
+  const queueProcessor = new QueueProcessor(
+    offlineQueue,
+    requestManager,
+    connectivityProvider
+  );
+
+  // Start listening for connectivity restoration
+  queueProcessor.start();
+
+  return new NetworkClient(
+    config,
+    requestManager,
+    requestRegistry,
+    connectivityProvider,
+    offlineQueue
+  );
 }

@@ -10268,6 +10268,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"react-native-mmkv@npm:^4.3.2":
+  version: 4.3.2
+  resolution: "react-native-mmkv@npm:4.3.2"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+    react-native-nitro-modules: "*"
+  checksum: 10c0/47c86114ee0ddbc8245dda174f419df9390a8ce0a6bcee0ded5eabd0b257e2b49257ddaf3b39eb5ab95ad7eed0ffa6d6b1e7c6bf8a3e56e6508408e49b98ed07
+  languageName: node
+  linkType: hard
+
 "react-native-monorepo-config@npm:^0.4.0":
   version: 0.4.0
   resolution: "react-native-monorepo-config@npm:0.4.0"
@@ -10299,7 +10310,9 @@ __metadata:
     react-dom: "npm:19.2.3"
     react-native: "npm:0.85.0"
     react-native-builder-bob: "npm:^0.43.0"
+    react-native-mmkv: "npm:^4.3.2"
     react-native-monorepo-config: "npm:^0.4.0"
+    react-native-nitro-modules: "npm:0.35.9"
     react-native-web: "npm:~0.21.2"
     vite: "npm:^7.1.1"
     vite-plugin-commonjs: "npm:^0.10.4"
@@ -10333,6 +10346,8 @@ __metadata:
     react: "npm:19.2.3"
     react-native: "npm:0.85.0"
     react-native-builder-bob: "npm:^0.43.0"
+    react-native-mmkv: "npm:^4.3.2"
+    react-native-nitro-modules: "npm:0.35.9"
     react-native-web: "npm:~0.21.2"
     release-it: "npm:^20.2.0"
     turbo: "npm:^2.9.16"
@@ -10342,6 +10357,16 @@ __metadata:
     react-native: "*"
   languageName: unknown
   linkType: soft
+
+"react-native-nitro-modules@npm:0.35.9":
+  version: 0.35.9
+  resolution: "react-native-nitro-modules@npm:0.35.9"
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 10c0/2e5c1b3eed1d187e7c2bbbf661e6405cb69c6a20b01427ea4c8a3bfe07a4baf2efbeb170a21f8c17fb0e18f022244f4b1fe1ce69a7ec824a7a4cf72441893cf1
+  languageName: node
+  linkType: hard
 
 "react-native-web@npm:~0.21.2":
   version: 0.21.2

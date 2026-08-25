@@ -166,6 +166,27 @@ const App = () => {
     controllerRef.current.abort();
   };
 
+  const testOfflineQueue = async () => {
+    setRequestStatus('📥 Testing offline queue...');
+    setError(null);
+    setResponse(null);
+
+    try {
+      const result = await client.post('/posts', {
+        title: 'Offline Test',
+        body: 'Queued request',
+        userId: 1,
+      });
+
+      setResponse(result);
+      setRequestStatus('✅ Request completed');
+      updateMetrics();
+    } catch (err: any) {
+      setError(err?.message ?? 'Request failed');
+      setRequestStatus('📥 Request queued');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -232,6 +253,9 @@ const App = () => {
         </View>
         <View style={styles.buttonContainer}>
           <Button title="Test Deduplication" onPress={makeDeduplicationTest} />
+        </View>
+        <View style={styles.buttonContainer}>
+          <Button title="Test Offline Queue" onPress={testOfflineQueue} />
         </View>
 
         {/* EVENTS */}
