@@ -38,6 +38,7 @@ export class RetryPolicy {
 
   getDelay(attempt: number): number {
     return calculateBackoff(attempt, {
+      strategy: this.config.backoff,
       initialDelay: this.config.initialDelay,
       maxDelay: this.config.maxDelay,
       jitter: this.config.jitter,

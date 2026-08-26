@@ -4,6 +4,7 @@ import { RequestRegistry } from '../request/RequestRegistry';
 import { createRequestKey } from '../request/createRequestKey';
 import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
 import { OfflineQueue } from '../queue/OfflineQueue';
+import { CancellationManager } from '../cancellation/CancellationManager';
 
 export class NetworkClient {
   constructor(
@@ -11,11 +12,20 @@ export class NetworkClient {
     private readonly requestManager: RequestManager,
     private readonly requestRegistry: RequestRegistry,
     private readonly connectivityProvider?: ConnectivityProvider,
-    private readonly offlineQueue?: OfflineQueue
+    private readonly offlineQueue?: OfflineQueue,
+    readonly cancellationManager?: CancellationManager
   ) {}
 
   getMetrics() {
     return this.requestManager.getMetrics();
+  }
+
+  cancelAll(): number {
+    return this.cancellationManager?.cancelAll() ?? 0;
+  }
+
+  cancel(requestId: string): boolean {
+    return this.cancellationManager?.cancel(requestId) ?? false;
   }
 
   async get<T>(

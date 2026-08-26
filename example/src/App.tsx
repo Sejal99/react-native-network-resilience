@@ -10,6 +10,33 @@ import {
 import NetInfo from '@react-native-community/netinfo';
 import { createNetworkClient } from 'react-native-network-resilience';
 
+class SimulatedConnectivityProvider {
+  private online = true;
+  private listeners = new Set<(online: boolean) => void>();
+
+  isOnline(): boolean {
+    return this.online;
+  }
+
+  setOnline(value: boolean): void {
+    this.online = value;
+    this.listeners.forEach((listener) => listener(value));
+  }
+
+  subscribe(callback: (online: boolean) => void): () => void {
+    this.listeners.add(callback);
+    return () => {
+      this.listeners.delete(callback);
+    };
+  }
+}
+
+const connectivity = new SimulatedConnectivityProvider();
+
+connectivity.subscribe((online) => {
+  console.log('🔌 [diag] provider online changed:', online);
+});
+
 const client = createNetworkClient({
   baseURL: 'https://jsonplaceholder.typicode.com',
 
@@ -20,6 +47,8 @@ const client = createNetworkClient({
   waitForConnectivity: true,
 
   connectivityTimeout: 30000,
+
+  connectivityProvider: connectivity,
 
   onEvent: (event) => {
     console.log('📡 NETWORK EVENT:', event);
@@ -39,6 +68,17 @@ const App = () => {
 
   const [events, _] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<any[]>([]);
+
+  const [simulatedOffline, setSimulatedOffline] = useState(false);
+
+  const toggleSimulatedOffline = () => {
+    const next = !simulatedOffline;
+
+    setSimulatedOffline(next);
+    connectivity.setOnline(!next);
+
+    console.log('🔌 SIMULATED OFFLINE:', next ? 'ON' : 'OFF', 'online=', !next);
+  };
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -184,6 +224,7 @@ const App = () => {
     } catch (err: any) {
       setError(err?.message ?? 'Request failed');
       setRequestStatus('📥 Request queued');
+      console.log('📥 [diag] offline queue result:', err?.message);
     }
   };
 
@@ -216,6 +257,23 @@ const App = () => {
                 ? 'YES ✅'
                 : 'NO ❌'}
           </Text>
+        </View>
+
+        {/* SIMULATED CONNECTIVITY */}
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Simulated Connectivity</Text>
+
+          <Text style={styles.text}>
+            Simulated Offline: {simulatedOffline ? 'ON 🔌' : 'OFF 🌐'}
+          </Text>
+
+          <View style={styles.buttonContainer}>
+            <Button
+              title="Toggle Simulated Offline"
+              onPress={toggleSimulatedOffline}
+            />
+          </View>
         </View>
 
         {/* REQUEST STATUS */}

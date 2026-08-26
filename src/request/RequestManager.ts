@@ -5,6 +5,7 @@ import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider'
 import { waitForConnectivity } from '../connectivity/waitForConnectivity';
 import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
 import { createRequestId } from './createRequestId';
+import { CancellationManager } from '../cancellation/CancellationManager';
 
 export class RequestManager {
   constructor(
@@ -13,7 +14,8 @@ export class RequestManager {
     private readonly connectivityProvider?: ConnectivityProvider,
     private readonly waitForNetwork = false,
     private readonly connectivityTimeout = 30000,
-    private readonly eventEmitter?: NetworkEventEmitter
+    private readonly eventEmitter?: NetworkEventEmitter,
+    private readonly cancellationManager?: CancellationManager
   ) {}
 
   getMetrics() {
@@ -23,6 +25,25 @@ export class RequestManager {
   async execute<T>(config: RequestConfig): Promise<T> {
     const requestId = createRequestId();
     const startTime = Date.now();
+
+    const controller = new AbortController();
+
+    this.cancellationManager?.register(requestId, controller);
+
+    const externalSignal = config.signal;
+
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        controller.abort();
+      } else {
+        externalSignal.addEventListener('abort', () => controller.abort());
+      }
+    }
+
+    const transportConfig: RequestConfig = {
+      ...config,
+      signal: controller.signal,
+    };
 
     this.eventEmitter?.emit({
       type: 'REQUEST_START',
@@ -47,7 +68,7 @@ export class RequestManager {
 
       while (true) {
         try {
-          const result = await this.transport.request<T>(config);
+          const result = await this.transport.request<T>(transportConfig);
 
           this.eventEmitter?.emit({
             type: 'REQUEST_SUCCESS',
@@ -117,6 +138,8 @@ export class RequestManager {
       }
 
       throw error;
+    } finally {
+      this.cancellationManager?.unregister(requestId);
     }
   }
 

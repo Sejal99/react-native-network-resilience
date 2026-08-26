@@ -8,6 +8,7 @@ import { NetInfoConnectivityProvider } from '../connectivity/NetInfoConnectivity
 import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
 import { OfflineQueue } from '../queue/OfflineQueue';
 import { QueueProcessor } from '../queue/QueueProcessor';
+import { CancellationManager } from '../cancellation/CancellationManager';
 
 const DEFAULT_RETRY_CONFIG = {
   maxAttempts: 3,
@@ -34,13 +35,16 @@ export function createNetworkClient(
 
   const retryPolicy = new RetryPolicy(retryConfig);
 
+  const cancellationManager = new CancellationManager();
+
   const requestManager = new RequestManager(
     transport,
     retryPolicy,
     connectivityProvider,
     config.waitForConnectivity ?? false,
     config.connectivityTimeout ?? 30000,
-    eventEmitter
+    eventEmitter,
+    cancellationManager
   );
 
   const requestRegistry = new RequestRegistry();
@@ -62,6 +66,7 @@ export function createNetworkClient(
     requestManager,
     requestRegistry,
     connectivityProvider,
-    offlineQueue
+    offlineQueue,
+    cancellationManager
   );
 }

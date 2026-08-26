@@ -7,10 +7,14 @@ import { NetworkError } from '../errors/NetworkError';
 import { OfflineQueue } from '../queue/OfflineQueue';
 import { QueueProcessor } from '../queue/QueueProcessor';
 import { RequestManager } from '../request/RequestManager';
+import { RequestRegistry } from '../request/RequestRegistry';
+import { NetworkClient } from '../client/NetworkClient';
 import { NetworkEventEmitter } from '../events/NetworkEventEmitter';
+import { CancellationManager } from '../cancellation/CancellationManager';
 
 import type { ConnectivityProvider } from '../connectivity/ConnectivityProvider';
 import type { HttpTransport } from '../transport/HttpTransport';
+import type { NetworkEvent } from '../events/NetworkEvent';
 import type { RequestConfig, RetryConfig } from '../types';
 
 const mockStorage = {
@@ -526,5 +530,330 @@ describe('RequestManager', () => {
     const metrics = manager.getMetrics();
 
     expect(metrics.length).toBeGreaterThan(0);
+  });
+});
+
+describe('RequestManager events', () => {
+  const collectEvents = () => {
+    const events: NetworkEvent[] = [];
+
+    const eventEmitter = new NetworkEventEmitter((event) => {
+      events.push(event);
+    });
+
+    const transport = {
+      request: jest.fn(),
+    } as unknown as HttpTransport;
+
+    const requestManager = new RequestManager(
+      transport,
+      new RetryPolicy(retryConfig),
+      undefined,
+      false,
+      30000,
+      eventEmitter
+    );
+
+    return { events, transport, requestManager };
+  };
+
+  it('emits REQUEST_START and REQUEST_SUCCESS with a generated request id', async () => {
+    const { events, transport, requestManager } = collectEvents();
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    ).mockResolvedValue({
+      ok: true,
+    });
+
+    const result = await requestManager.execute({
+      url: '/users/1',
+      method: 'GET',
+    });
+
+    expect(result).toEqual({ ok: true });
+
+    const start = events.find((e) => e.type === 'REQUEST_START');
+    const success = events.find((e) => e.type === 'REQUEST_SUCCESS');
+
+    expect(start).toBeDefined();
+    expect(success).toBeDefined();
+    expect(start?.requestId).toMatch(/^request-\d+$/);
+    expect(success?.requestId).toBe(start?.requestId);
+  });
+
+  it('emits REQUEST_RETRY on a retryable failure', async () => {
+    const { events, transport, requestManager } = collectEvents();
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    )
+      .mockRejectedValueOnce(
+        new NetworkError('Network failed', { code: 'NETWORK_ERROR' })
+      )
+      .mockResolvedValueOnce({ ok: true });
+
+    await requestManager.execute({ url: '/users', method: 'GET' });
+
+    expect(events.some((e) => e.type === 'REQUEST_RETRY')).toBe(true);
+    expect(events.some((e) => e.type === 'REQUEST_SUCCESS')).toBe(true);
+  });
+
+  it('emits REQUEST_CANCELLED and never retries a cancelled request', async () => {
+    const { events, transport, requestManager } = collectEvents();
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    ).mockRejectedValue(
+      new NetworkError('Request cancelled', { code: 'CANCELLED' })
+    );
+
+    const controller = new AbortController();
+
+    await expect(
+      requestManager.execute({
+        url: '/users',
+        method: 'GET',
+        signal: controller.signal,
+      })
+    ).rejects.toThrow();
+
+    expect(events.some((e) => e.type === 'REQUEST_CANCELLED')).toBe(true);
+    expect(events.some((e) => e.type === 'REQUEST_RETRY')).toBe(false);
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+
+  it('emits REQUEST_ERROR on a non-retryable failure', async () => {
+    const { events, transport, requestManager } = collectEvents();
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    ).mockRejectedValue(
+      new NetworkError('Forbidden', { code: 'HTTP_ERROR', status: 403 })
+    );
+
+    await expect(
+      requestManager.execute({ url: '/users', method: 'GET' })
+    ).rejects.toThrow();
+
+    expect(events.some((e) => e.type === 'REQUEST_ERROR')).toBe(true);
+    expect(transport.request).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('BackoffStrategy fixed', () => {
+  it('should use a constant delay for fixed backoff', () => {
+    const policy = new RetryPolicy({
+      maxAttempts: 5,
+      backoff: 'fixed',
+      initialDelay: 200,
+      maxDelay: 1000,
+      jitter: false,
+    });
+
+    expect(policy.getDelay(1)).toBe(200);
+    expect(policy.getDelay(2)).toBe(200);
+    expect(policy.getDelay(3)).toBe(200);
+  });
+});
+
+describe('Request deduplication', () => {
+  it('should coalesce concurrent identical GET requests', async () => {
+    const transport = {
+      request: jest.fn(),
+    } as unknown as HttpTransport;
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    ).mockResolvedValue({
+      id: 1,
+    });
+
+    const requestManager = new RequestManager(
+      transport,
+      new RetryPolicy(retryConfig)
+    );
+
+    const requestRegistry = new RequestRegistry();
+
+    const client = new NetworkClient(
+      { deduplication: true },
+      requestManager,
+      requestRegistry
+    );
+
+    const [a, b] = await Promise.all([
+      client.get('/todos/1'),
+      client.get('/todos/1'),
+    ]);
+
+    expect(transport.request).toHaveBeenCalledTimes(1);
+    expect(a).toEqual(b);
+  });
+
+  it('should not deduplicate when disabled', async () => {
+    const transport = {
+      request: jest.fn(),
+    } as unknown as HttpTransport;
+
+    (
+      transport.request as jest.Mock<
+        (config: RequestConfig) => Promise<unknown>
+      >
+    ).mockResolvedValue({
+      id: 1,
+    });
+
+    const requestManager = new RequestManager(
+      transport,
+      new RetryPolicy(retryConfig)
+    );
+
+    const requestRegistry = new RequestRegistry();
+
+    const client = new NetworkClient(
+      { deduplication: false },
+      requestManager,
+      requestRegistry
+    );
+
+    await Promise.all([client.get('/todos/1'), client.get('/todos/1')]);
+
+    expect(transport.request).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('QueueProcessor drain on launch', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockStorage.getString.mockReturnValue(undefined);
+  });
+
+  it('should process persisted requests when launched while online', async () => {
+    const offlineQueue = new OfflineQueue();
+
+    offlineQueue.add({ url: '/posts', method: 'POST' });
+
+    const execute = jest.fn() as unknown as jest.Mock<
+      (config: RequestConfig) => Promise<unknown>
+    >;
+
+    execute.mockResolvedValue({});
+
+    const requestManager = {
+      execute,
+    } as unknown as RequestManager;
+
+    const connectivityProvider: ConnectivityProvider = {
+      isOnline: jest.fn(() => true),
+      subscribe: jest.fn(() => jest.fn()),
+    };
+
+    const processor = new QueueProcessor(
+      offlineQueue,
+      requestManager,
+      connectivityProvider
+    );
+
+    processor.start();
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(offlineQueue.size).toBe(0);
+  });
+});
+
+describe('CancellationManager', () => {
+  it('registers, cancels and unregisters controllers', () => {
+    const manager = new CancellationManager();
+    const controller = new AbortController();
+
+    manager.register('r1', controller);
+
+    expect(manager.activeCount).toBe(1);
+    expect(manager.cancel('r1')).toBe(true);
+    expect(controller.signal.aborted).toBe(true);
+    expect(manager.activeCount).toBe(0);
+    expect(manager.cancel('r1')).toBe(false);
+  });
+
+  it('cancelAll aborts every active controller', () => {
+    const manager = new CancellationManager();
+    const a = new AbortController();
+    const b = new AbortController();
+
+    manager.register('a', a);
+    manager.register('b', b);
+
+    expect(manager.cancelAll()).toBe(2);
+    expect(a.signal.aborted).toBe(true);
+    expect(b.signal.aborted).toBe(true);
+    expect(manager.activeCount).toBe(0);
+  });
+});
+
+describe('NetworkClient cancellation', () => {
+  it('cancelAll aborts in-flight requests and emits REQUEST_CANCELLED', async () => {
+    const cancellationManager = new CancellationManager();
+
+    const events: NetworkEvent[] = [];
+    const eventEmitter = new NetworkEventEmitter((e) => events.push(e));
+
+    const transport = {
+      request: jest.fn(
+        (config: RequestConfig) =>
+          new Promise<unknown>((_resolve, reject) => {
+            config.signal?.addEventListener('abort', () => {
+              reject(
+                new NetworkError('Request cancelled', { code: 'CANCELLED' })
+              );
+            });
+          })
+      ),
+    } as unknown as HttpTransport;
+
+    const requestManager = new RequestManager(
+      transport,
+      new RetryPolicy(retryConfig),
+      undefined,
+      false,
+      30000,
+      eventEmitter,
+      cancellationManager
+    );
+
+    const client = new NetworkClient(
+      {},
+      requestManager,
+      new RequestRegistry(),
+      undefined,
+      undefined,
+      cancellationManager
+    );
+
+    const promise = client.get('/slow');
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(cancellationManager.activeCount).toBe(1);
+
+    const cancelled = client.cancelAll();
+
+    expect(cancelled).toBe(1);
+
+    await expect(promise).rejects.toThrow();
+
+    expect(events.some((e) => e.type === 'REQUEST_CANCELLED')).toBe(true);
   });
 });

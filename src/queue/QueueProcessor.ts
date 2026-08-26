@@ -12,12 +12,21 @@ export class QueueProcessor {
   ) {}
 
   start(): () => void {
-    return this.connectivityProvider.subscribe((online) => {
+    const unsubscribe = this.connectivityProvider.subscribe((online) => {
       if (online) {
         // eslint-disable-next-line no-void
         void this.process();
       }
     });
+
+    // Drain any requests that were persisted while the app was offline
+    // and restored on launch while connectivity is already available.
+    if (this.connectivityProvider.isOnline()) {
+      // eslint-disable-next-line no-void
+      void this.process();
+    }
+
+    return unsubscribe;
   }
 
   async process(): Promise<void> {
