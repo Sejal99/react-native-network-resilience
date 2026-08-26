@@ -14,6 +14,7 @@ export class QueueProcessor {
   start(): () => void {
     return this.connectivityProvider.subscribe((online) => {
       if (online) {
+        // eslint-disable-next-line no-void
         void this.process();
       }
     });

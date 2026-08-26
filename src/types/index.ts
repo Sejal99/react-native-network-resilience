@@ -7,7 +7,7 @@ export type BackoffStrategy = 'fixed' | 'exponential';
 
 export interface RetryConfig {
   maxAttempts: number;
-  backoff: BackoffStrategy;
+  backoff: 'fixed' | 'exponential';
   initialDelay: number;
   maxDelay: number;
   jitter: boolean;
